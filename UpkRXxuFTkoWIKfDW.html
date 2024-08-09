@@ -1,0 +1,283 @@
+<html><head><base href="https://dreidel.ai/"><script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+<style>
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'MS Sans Serif', Arial, sans-serif;
+    background-color: #008080;
+    color: #000000;
+  }
+  #gameArea {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+    background-color: #008080;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" fill="%23008080"/><path d="M0 10 L10 0 L20 10 L10 20 Z" fill="%2300a1a1"/></svg>');
+    background-repeat: repeat;
+  }
+  .clippy {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    background-image: url('https://images-wixmp-ed30a86b8c4ca887773594c2.wixmp.com/f/2940875f-9dc8-4a45-ab4a-46e9b9bfe9ad/dgpuazt-118e573a-2327-477f-82a7-573e5f6d6738.png?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1cm46YXBwOjdlMGQxODg5ODIyNjQzNzNhNWYwZDQxNWVhMGQyNmUwIiwiaXNzIjoidXJuOmFwcDo3ZTBkMTg4OTgyMjY0MzczYTVmMGQ0MTVlYTBkMjZlMCIsIm9iaiI6W1t7InBhdGgiOiJcL2ZcLzI5NDA4NzVmLTlkYzgtNGE0NS1hYjRhLTQ2ZTliOWJmZTlhZFwvZGdwdWF6dC0xMThlNTczYS0yMzI3LTQ3N2YtODJhNy01NzNlNWY2ZDY3MzgucG5nIn1dXSwiYXVkIjpbInVybjpzZXJ2aWNlOmZpbGUuZG93bmxvYWQiXX0.rkzWcjJ_HaHO6hSnaQ9rKvaXbbB_tRrFOetixRINLRE');
+    background-size: contain;
+    background-repeat: no-repeat;
+    cursor: move;
+    user-select: none;
+  }
+  .window98 {
+    background-color: #c0c0c0;
+    border: 2px solid;
+    border-top-color: #dfdfdf;
+    border-left-color: #dfdfdf;
+    border-right-color: #808080;
+    border-bottom-color: #808080;
+    box-shadow: 1px 1px 0 0 #000000;
+    padding: 2px;
+  }
+  .titlebar {
+    background: linear-gradient(90deg, #000080, #1084d0);
+    padding: 3px 2px 3px 3px;
+    color: white;
+    font-weight: bold;
+  }
+  #connectionInfo {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 200px;
+  }
+  button {
+    font-family: 'MS Sans Serif', Arial, sans-serif;
+    font-size: 11px;
+    background-color: #c0c0c0;
+    border: 2px solid;
+    border-top-color: #dfdfdf;
+    border-left-color: #dfdfdf;
+    border-right-color: #808080;
+    border-bottom-color: #808080;
+    padding: 4px 10px;
+    margin: 2px;
+    cursor: pointer;
+  }
+  button:active {
+    border-top-color: #808080;
+    border-left-color: #808080;
+    border-right-color: #dfdfdf;
+    border-bottom-color: #dfdfdf;
+  }
+</style>
+</head>
+<body>
+<div id="gameArea"></div>
+<div id="connectionInfo" class="window98">
+  <div class="titlebar">Connection Info</div>
+  <div style="padding: 5px;">
+    Your ID: <span id="myId"></span><br>
+    Connected peers: <span id="peerCount">0</span>
+  </div>
+</div>
+
+<script>
+const gameArea = document.getElementById('gameArea');
+const myIdSpan = document.getElementById('myId');
+const peerCountSpan = document.getElementById('peerCount');
+
+let peer;
+let connections = [];
+
+function initializePeer() {
+  peer = new Peer();
+  
+  peer.on('open', (id) => {
+    myIdSpan.textContent = id;
+    console.log('My peer ID is: ' + id);
+  });
+
+  peer.on('connection', (conn) => {
+    handleConnection(conn);
+  });
+}
+
+function handleConnection(conn) {
+  connections.push(conn);
+  updatePeerCount();
+
+  conn.on('data', (data) => {
+    if (data.type === 'move') {
+      moveClippy(data.id, data.x, data.y);
+    } else if (data.type === 'new') {
+      createClippy(data.id, data.x, data.y);
+    }
+  });
+
+  conn.on('close', () => {
+    connections = connections.filter(c => c !== conn);
+    updatePeerCount();
+    removeClippy(conn.peer);
+  });
+}
+
+function updatePeerCount() {
+  peerCountSpan.textContent = connections.length;
+}
+
+function createClippy(id, x, y) {
+  if (!document.getElementById(id)) {
+    const clippy = document.createElement('div');
+    clippy.id = id;
+    clippy.className = 'clippy';
+    clippy.style.left = `${x}px`;
+    clippy.style.top = `${y}px`;
+    gameArea.appendChild(clippy);
+    
+    if (id === peer.id) {
+      makeClippyDraggable(clippy);
+    }
+  }
+}
+
+function moveClippy(id, x, y) {
+  const clippy = document.getElementById(id);
+  if (clippy) {
+    clippy.style.left = `${x}px`;
+    clippy.style.top = `${y}px`;
+  }
+}
+
+function removeClippy(id) {
+  const clippy = document.getElementById(id);
+  if (clippy) {
+    clippy.remove();
+  }
+}
+
+function makeClippyDraggable(clippy) {
+  let isDragging = false;
+  let startX, startY;
+
+  clippy.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startX = e.clientX - clippy.offsetLeft;
+    startY = e.clientY - clippy.offsetTop;
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+      const x = e.clientX - startX;
+      const y = e.clientY - startY;
+      moveClippy(peer.id, x, y);
+      broadcastPosition(x, y);
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+  });
+}
+
+function broadcastPosition(x, y) {
+  const data = {
+    type: 'move',
+    id: peer.id,
+    x: x,
+    y: y
+  };
+  connections.forEach(conn => conn.send(data));
+}
+
+function getRandomPosition() {
+  const x = Math.random() * (gameArea.clientWidth - 100);
+  const y = Math.random() * (gameArea.clientHeight - 100);
+  return { x, y };
+}
+
+initializePeer();
+
+// Create local Clippy
+peer.on('open', () => {
+  const { x, y } = getRandomPosition();
+  createClippy(peer.id, x, y);
+  
+  // Broadcast new Clippy to all peers
+  const data = {
+    type: 'new',
+    id: peer.id,
+    x: x,
+    y: y
+  };
+  connections.forEach(conn => conn.send(data));
+});
+
+// Connect to a peer
+function connectToPeer() {
+  const peerId = prompt("Enter peer ID to connect:");
+  if (peerId) {
+    const conn = peer.connect(peerId);
+    handleConnection(conn);
+  }
+}
+
+// Add a button to connect to peers
+const connectButton = document.createElement('button');
+connectButton.textContent = 'Connect to Peer';
+connectButton.style.position = 'absolute';
+connectButton.style.top = '10px';
+connectButton.style.right = '10px';
+connectButton.addEventListener('click', connectToPeer);
+document.body.appendChild(connectButton);
+
+// Add Windows 98 start menu
+const startMenu = document.createElement('div');
+startMenu.className = 'window98';
+startMenu.style.position = 'absolute';
+startMenu.style.bottom = '0';
+startMenu.style.left = '0';
+startMenu.style.right = '0';
+startMenu.style.height = '30px';
+startMenu.style.display = 'flex';
+startMenu.style.alignItems = 'center';
+startMenu.style.padding = '0 5px';
+
+const startButton = document.createElement('button');
+startButton.textContent = 'Start';
+startButton.style.fontWeight = 'bold';
+startButton.addEventListener('click', () => alert('Windows 98 Start Menu (Not implemented)'));
+
+startMenu.appendChild(startButton);
+document.body.appendChild(startMenu);
+
+// Add desktop icons
+function createDesktopIcon(name, top, left) {
+  const icon = document.createElement('div');
+  icon.className = 'window98';
+  icon.style.position = 'absolute';
+  icon.style.top = top;
+  icon.style.left = left;
+  icon.style.width = '64px';
+  icon.style.textAlign = 'center';
+  icon.style.cursor = 'pointer';
+
+  const img = document.createElement('div');
+  img.style.width = '32px';
+  img.style.height = '32px';
+  img.style.margin = '0 auto 5px';
+  img.style.backgroundColor = '#c0c0c0';
+
+  const text = document.createElement('div');
+  text.textContent = name;
+  text.style.fontSize = '11px';
+
+  icon.appendChild(img);
+  icon.appendChild(text);
+  gameArea.appendChild(icon);
+}
+
+createDesktopIcon('My Computer', '10px', '10px');
+createDesktopIcon('Network Neighborhood', '90px', '10px');
+createDesktopIcon('Recycle Bin', '170px', '10px');
+
+</script>
+</body></html>
